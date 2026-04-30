@@ -1,0 +1,1790 @@
+<!--
+Update checklist:
+1) Uuenda .subtitle periood ja allikas.
+2) Uuenda Ülevaade KPI-d reportData.overview blokis.
+3) Täida Uued andmed KPI-d/graafik reportData.newData blokis sama perioodi andmetega.
+4) Kontrolli, et Peamised tähelepanekud numbrid ühtiksid reportData väärtustega (tekstid arvutatakse andmete põhjal).
+5) Tee visuaalne kontroll: @media (max-width: 600px) kaardid + graafikute telje y.max automaatskaala.
+-->
+<!DOCTYPE html>
+<html lang="et">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HARNO analüüsid — Lõpetamise analüüs</title>
+<style>
+  :root {
+    --color-background-primary: #ffffff;
+    --color-background-secondary: #f4f3ef;
+    --color-text-primary: #1a1a18;
+    --color-text-secondary: #6b6b67;
+    --color-border-tertiary: rgba(0,0,0,0.12);
+    --color-border-info: #378ADD;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+    --font-sans: 'DM Sans', system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-background-primary: #1c1c1a;
+      --color-background-secondary: #272724;
+      --color-text-primary: #f0ede6;
+      --color-text-secondary: #9a9993;
+      --color-border-tertiary: rgba(255,255,255,0.12);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-sans);
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+    font-size: 16px;
+    line-height: 1.7;
+    padding: 2rem;
+    max-width: 820px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    margin-bottom: 0.4rem;
+  }
+  .category-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 1rem;
+  }
+  .category-tab {
+    border: 1px solid var(--color-border-tertiary);
+    border-radius: 999px;
+    background: var(--color-background-primary);
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 0.35rem 0.8rem;
+  }
+  .category-tab.is-active {
+    background: var(--color-background-secondary);
+    color: var(--color-text-primary);
+    border-color: transparent;
+  }
+  .category-panel[hidden] { display: none; }
+  .category-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    margin-bottom: 0.25rem;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin-bottom: 1.5rem;
+  }
+  .section-title {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 1.5rem 0 0.6rem;
+  }
+  .metric-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+    gap: 10px;
+    margin-bottom: 0.5rem;
+  }
+  @media (max-width: 600px) {
+    .metric-row { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  }
+  .metric {
+    background: var(--color-background-secondary);
+    border-radius: var(--border-radius-md);
+    padding: 0.8rem 1rem;
+    min-width: 0;
+  }
+  .metric-label { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 3px; }
+  .metric-value { font-size: 20px; font-weight: 500; color: var(--color-text-primary); word-break: break-word; }
+  .metric-sub { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
+  .legend {
+    display: flex;
+    gap: 18px;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    flex-wrap: wrap;
+  }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .divider {
+    border: none;
+    border-top: 0.5px solid var(--color-border-tertiary);
+    margin: 1.4rem 0;
+  }
+  .pie-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 1rem;
+  }
+  .pie-label {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-bottom: 4px;
+  }
+  .findings-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    margin: 1.5rem 0 0.8rem;
+  }
+  .insight {
+    background: var(--color-background-secondary);
+    border-left: 2px solid var(--color-border-info);
+    border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0;
+    padding: 0.7rem 1rem;
+    margin: 0.5rem 0;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    line-height: 1.6;
+  }
+  .insight strong { font-weight: 500; }
+  .sample-note {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-bottom: 0.8rem;
+  }
+  .map-wrap {
+    background: var(--color-background-secondary);
+    border: 1px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-lg);
+    padding: 0.75rem;
+  }
+  #participantsGeoMap {
+    position: relative;
+    width: 100%;
+  }
+  #participantsGeoMap svg { display: block; width: 100%; height: auto; }
+  .map-tooltip {
+    position: absolute;
+    pointer-events: none;
+    z-index: 3;
+    max-width: min(260px, 88%);
+    background: rgba(26, 26, 24, 0.96);
+    color: #fff;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.35;
+    padding: 0.4rem 0.55rem;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.22);
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+  .map-tooltip.is-visible { opacity: 1; }
+  .map-legend {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 0.8rem;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+  .map-legend-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .map-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .map-legend-bar {
+    width: 120px;
+    height: 10px;
+    border-radius: 5px;
+  }
+  @media (max-width: 480px) {
+    body { padding: 1rem 0.8rem 1.25rem; }
+    .map-wrap { padding: 0.55rem; }
+    .map-legend { gap: 0.65rem; font-size: 11px; }
+  }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- ============================================================
+     //kood brand overlay (thin)
+     - Token overrides only — original structure untouched
+     - Loaded last so it wins specificity ties
+     ============================================================ -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap">
+<style id="kood-brand-overlay">
+  :root {
+    /* //kood palette (matches partner deck working palette) */
+    --kood-ink:        #232830;
+    --kood-paper:      #F9F9F9;
+    --kood-paper-2:    #F2F2F2;
+    --kood-rule:       #ECECEC;
+    --kood-mute:       #7B7F85;
+    --kood-mute-2:     #B5B8BB;
+    --kood-yellow:     #DCF900;
+
+    /* Override host tokens */
+    --color-background-primary: var(--kood-paper);
+    --color-background-secondary: var(--kood-paper-2);
+    --color-text-primary: var(--kood-ink);
+    --color-text-secondary: var(--kood-mute);
+    --color-border-tertiary: var(--kood-rule);
+    --color-border-info: var(--kood-yellow);
+    --border-radius-md: 6px;
+    --border-radius-lg: 8px;
+    --font-sans: 'Montserrat', system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-background-primary: var(--kood-ink);
+      --color-background-secondary: #151B26;
+      --color-text-primary: #F0F2F5;
+      --color-text-secondary: var(--kood-mute-2);
+      --color-border-tertiary: rgba(255,255,255,0.12);
+      --color-border-info: var(--kood-yellow);
+    }
+  }
+
+  body {
+    font-feature-settings: 'ss01';
+    letter-spacing: -0.005em;
+  }
+
+  /* Brand row replacing the H1 */
+  .kood-brand-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 0.4rem;
+    padding-bottom: 0.7rem;
+    position: relative;
+    border-bottom: 1px solid var(--color-border-tertiary);
+  }
+  .kood-brand-row::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: -1px;
+    width: 88px;
+    height: 2px;
+    background: var(--kood-yellow);
+  }
+  .kood-wordmark {
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: -0.02em;
+    color: var(--kood-ink);
+  }
+  .kood-slash { letter-spacing: -0.04em; }
+  .kood-divider {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    font-weight: 400;
+  }
+  .kood-brand-row h1 {
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  @media (prefers-color-scheme: dark) {
+    .kood-wordmark { color: #F0F2F5; }
+    .kood-wordmark .kood-slash { color: var(--kood-yellow); }
+  }
+
+  /* Subtitle / period */
+  .subtitle {
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-size: 11px;
+  }
+
+  /* Tabs — flatter, more //kood */
+  .category-tab {
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 0.45rem 0.9rem;
+  }
+  .category-tab.is-active {
+    background: var(--kood-ink);
+    color: var(--kood-paper);
+    border-color: var(--kood-ink);
+    box-shadow: inset 0 -2px 0 var(--kood-yellow);
+  }
+  @media (prefers-color-scheme: dark) {
+    .category-tab.is-active {
+      background: var(--kood-yellow);
+      color: var(--kood-ink);
+    }
+  }
+
+  /* Section eyebrows: tightened */
+  .section-title {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    border-top: 1px solid var(--color-border-tertiary);
+    padding-top: 1rem;
+    margin: 1.6rem 0 0.7rem;
+  }
+
+  /* Metric cards — thinner, more grid-y */
+  .metric {
+    border-radius: 4px;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid transparent;
+  }
+  .metric-label {
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 600;
+    font-size: 10px;
+  }
+  .metric-value {
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: -0.015em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Findings / insights — yellow accent on dark, ink accent on light */
+  .findings-title {
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: -0.01em;
+  }
+  .insight {
+    border-left-width: 3px;
+    border-radius: 0 4px 4px 0;
+    background: var(--color-background-secondary);
+  }
+  .insight strong { font-weight: 700; }
+
+  /* Map */
+  .map-wrap {
+    border-radius: 6px;
+    border-color: var(--color-border-tertiary);
+  }
+
+  /* Tooltip */
+  .map-tooltip {
+    background: var(--kood-ink);
+    border-radius: 4px;
+    font-weight: 500;
+  }
+  @media (prefers-color-scheme: dark) {
+    .map-tooltip { background: var(--kood-yellow); color: var(--kood-ink); }
+  }
+
+  /* Pill swatch corners squarer */
+  .swatch { border-radius: 1px; }
+
+  /* Subtle yellow underline on H1 anchor on hover */
+  .kood-brand-row h1::after {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: var(--kood-yellow);
+    margin-left: 8px;
+    vertical-align: 0.15em;
+  }
+</style>
+</head>
+<body>
+
+<div class="kood-brand-row">
+    <span class="kood-wordmark"><span class="kood-slash">//</span>kood</span>
+    <span class="kood-divider">×</span>
+    <h1>HARNO analüüsid</h1>
+  </div>
+<p class="subtitle" id="subtitle"></p>
+
+<div class="category-tabs" role="tablist" aria-label="Analüüsi kategooriad">
+  <button class="category-tab is-active" role="tab" aria-selected="true" type="button" data-target="completion-analysis">Lõpetamise analüüs</button>
+  <button class="category-tab" role="tab" aria-selected="false" type="button" data-target="participants-overview">Osalejate ülevaade</button>
+  <button class="category-tab" role="tab" aria-selected="false" type="button" data-target="map-view">Kaardivaade</button>
+</div>
+
+<section id="completion-analysis" class="category-panel" aria-label="Lõpetamise analüüs">
+<p class="category-title">Lõpetamise analüüs</p>
+
+<p class="section-title">Ülevaade</p>
+<div class="metric-row">
+  <div class="metric">
+    <p class="metric-label">Lõpetajad</p>
+    <p class="metric-value" id="overviewActive"></p>
+  </div>
+  <div class="metric">
+    <p class="metric-label">Katkestajad</p>
+    <p class="metric-value" id="overviewDropout"></p>
+    <p class="metric-sub" id="overviewDropoutRate"></p>
+  </div>
+  <div class="metric">
+    <p class="metric-label">Sugu — lõpetajad</p>
+    <p class="metric-value" id="overviewGenderActive"></p>
+    <p class="metric-sub">M / N</p>
+  </div>
+  <div class="metric">
+    <p class="metric-label">Sugu — katkestajad</p>
+    <p class="metric-value" id="overviewGenderDropout"></p>
+    <p class="metric-sub">M / N</p>
+  </div>
+</div>
+
+<hr class="divider">
+
+<p class="section-title">Haridustase</p>
+<div class="legend">
+  <span><span class="swatch" style="background:#232830;"></span>Lõpetajad</span>
+  <span><span class="swatch" style="background:#DCF900;"></span>Katkestajad</span>
+</div>
+<div style="position:relative;width:100%;height:160px;">
+  <canvas id="eduChart"></canvas>
+</div>
+
+<hr class="divider">
+
+<p class="section-title">Elukoht</p>
+<div class="legend">
+  <span><span class="swatch" style="background:#232830;"></span>Lõpetajad</span>
+  <span><span class="swatch" style="background:#DCF900;"></span>Katkestajad</span>
+</div>
+<div style="position:relative;width:100%;height:160px;">
+  <canvas id="localChart"></canvas>
+</div>
+
+<div class="pie-row">
+  <div>
+    <p class="pie-label">Lõpetajad</p>
+    <div style="position:relative;width:100%;height:120px;">
+      <canvas id="pieActive"></canvas>
+    </div>
+  </div>
+  <div>
+    <p class="pie-label">Katkestajad</p>
+    <div style="position:relative;width:100%;height:120px;">
+      <canvas id="pieDropout"></canvas>
+    </div>
+  </div>
+</div>
+<div class="legend" style="margin-top:8px;">
+  <span><span class="swatch" style="background:#232830;"></span>Tallinn</span>
+  <span><span class="swatch" style="background:#DCF900;"></span>Harjumaa (v.a Tallinn)</span>
+  <span><span class="swatch" style="background:#56CAF5;"></span>Muu Eesti</span>
+  <span><span class="swatch" style="background:#B5B8BB;"></span>Teadmata</span>
+</div>
+
+<hr class="divider">
+
+<p class="section-title">Uued andmed</p>
+<div class="metric-row" id="newSegmentMetrics"></div>
+<div style="position:relative;width:100%;height:160px;">
+  <canvas id="newSegmentChart"></canvas>
+</div>
+
+<hr class="divider">
+
+<p class="findings-title">Peamised tähelepanekud</p>
+<div id="insights"></div>
+</section>
+
+<section id="participants-overview" class="category-panel" aria-label="Osalejate ülevaade" hidden>
+<p class="category-title">Osalejate ülevaade</p>
+<p class="sample-note" id="participantsSourceNote"></p>
+
+<p class="section-title">Ülevaade</p>
+<div class="metric-row" id="participantsKpis"></div>
+
+<hr class="divider">
+
+<p class="section-title">Geograafiline jaotus</p>
+<p class="sample-note" id="participantsGeoNote"></p>
+<div style="position:relative;width:100%;height:240px;">
+  <canvas id="participantsGeoChart"></canvas>
+</div>
+
+<hr class="divider">
+
+<p class="section-title">Demograafiline jaotus</p>
+<div class="metric-row" id="participantsDemoMetrics"></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:1rem;">
+  <div>
+    <p class="pie-label">Soo jaotus</p>
+    <div style="position:relative;width:100%;height:220px;">
+      <canvas id="participantsGenderChart"></canvas>
+    </div>
+  </div>
+  <div>
+    <p class="pie-label">Vanuserühmad</p>
+    <div style="position:relative;width:100%;height:220px;">
+      <canvas id="participantsAgeChart"></canvas>
+    </div>
+  </div>
+</div>
+<div style="position:relative;width:100%;height:240px;margin-top:1rem;">
+  <canvas id="participantsAgeGenderChart"></canvas>
+</div>
+
+<hr class="divider">
+
+<p class="section-title">Haridus</p>
+<div style="position:relative;width:100%;height:260px;">
+  <canvas id="participantsEducationChart"></canvas>
+</div>
+
+<hr class="divider">
+
+<p class="section-title">Amet</p>
+<div style="position:relative;width:100%;height:260px;">
+  <canvas id="participantsOccupationChart"></canvas>
+</div>
+
+<hr class="divider">
+
+<p class="section-title">Tööandja / sektor</p>
+<p class="sample-note" id="participantsSectorNote"></p>
+<div style="position:relative;width:100%;height:240px;">
+  <canvas id="participantsSectorChart"></canvas>
+</div>
+
+<hr class="divider">
+
+<p class="findings-title">Peamised tähelepanekud</p>
+<div id="participantInsights"></div>
+</section>
+
+<section id="map-view" class="category-panel" aria-label="Kaardivaade" hidden>
+<p class="category-title">Kaardivaade</p>
+<p class="sample-note" id="participantsMapNote"></p>
+<div class="map-wrap">
+  <div id="participantsGeoMap"></div>
+  <div class="map-legend" id="participantsGeoMapLegend"></div>
+</div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script>
+const reportMeta = {
+  period: 'aprill 2026',
+  source: '28.04.2026 Andmed HARNO aruande jaoks.xlsx'
+};
+
+// Data source for all dashboard sections
+const reportData = {
+  overview: {
+    period: reportMeta.period,
+    active: 158,
+    dropout: 128,
+    dropoutRate: 45,
+    genderActive: [54, 46],
+    genderDropout: [55, 45]
+  },
+  education: {
+    period: reportMeta.period,
+    labels: ['Kõrgharidus', 'Üldkeskharidus', 'Kutseharidus'],
+    datasets: [
+      { label: 'Lõpetajad', data: [74.5, 24.8, 0.7], backgroundColor: '#232830' },
+      { label: 'Katkestajad', data: [80.8, 17.6, 1.6], backgroundColor: '#DCF900' }
+    ]
+  },
+  location: {
+    period: reportMeta.period,
+    labels: ['Tallinn', 'Harjumaa (v.a Tallinn)', 'Muu Eesti'],
+    datasets: [
+      { label: 'Lõpetajad', data: [46.2, 13.3, 37.3], backgroundColor: '#232830' },
+      { label: 'Katkestajad', data: [39.8, 20.3, 37.5], backgroundColor: '#DCF900' }
+    ],
+    pieLabels: ['Tallinn', 'Harjumaa', 'Muu Eesti', 'Teadmata'],
+    pieColors: ['#232830', '#DCF900', '#56CAF5', '#B5B8BB'],
+    pieActive: [46.2, 13.3, 37.3, 3.2],
+    pieDropout: [39.8, 20.3, 37.5, 2.3]
+  },
+  newData: {
+    period: reportMeta.period,
+    metrics: [
+      { label: 'Keskmine vanus — lõpetajad', value: '36.3' },
+      { label: 'Keskmine vanus — katkestajad', value: '37.2' },
+      { label: 'Töötavad — lõpetajad', value: '52%' },
+      { label: 'Töötavad — katkestajad', value: '56%' }
+    ],
+    chart: {
+      labels: ['Keskmine vanus', 'Töötavad osalejad'],
+      datasets: [
+        { label: 'Lõpetajad', data: [36.3, 52], backgroundColor: '#232830' },
+        { label: 'Katkestajad', data: [37.2, 56], backgroundColor: '#56CAF5' }
+      ]
+    }
+  },
+  participantsOverview: {
+    meta: {"source":"28.04.2026 Andmed HARNO aruande jaoks.xlsx · töölehed Registreeritud + Katkestatud","updated":"28.04.2026"},
+    sourceRows: [{"Elukoha omavalitsuse väli":"Antsla vald","Sugu":"Naised","Sünniaasta":1991,"Vanus":34,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Haapsalu linn","Sugu":"Naised","Sünniaasta":1998,"Vanus":28,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Haapsalu linn","Sugu":"Mehed","Sünniaasta":1980,"Vanus":45,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"Eugesta Eesti OÜ"},{"Elukoha omavalitsuse väli":"Haljala vald","Sugu":"Naised","Sünniaasta":1987,"Vanus":38,"Osaleja haridustase":"kõrgharidus","Amet":"Teenindus- ja müügitöötajad","Tööandja":"Sihtasutus Virumaa Muuseumid"},{"Elukoha omavalitsuse väli":"Haljala vald","Sugu":"Mehed","Sünniaasta":1985,"Vanus":40,"Osaleja haridustase":"kõrgharidus","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"Elering AS"},{"Elukoha omavalitsuse väli":"Harku vald","Sugu":"Naised","Sünniaasta":1983,"Vanus":43,"Osaleja haridustase":"kõrgharidus","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"MTÜ Viipelism"},{"Elukoha omavalitsuse väli":"Harku vald","Sugu":"Naised","Sünniaasta":1976,"Vanus":49,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Harku vald","Sugu":"Naised","Sünniaasta":1980,"Vanus":45,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Jõhvi vald","Sugu":"Mehed","Sünniaasta":1984,"Vanus":41,"Osaleja haridustase":"kutseharidus pärast põhiharidust","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Jõhvi vald","Sugu":"Mehed","Sünniaasta":1972,"Vanus":53,"Osaleja haridustase":"kõrgharidus","Amet":"Sõjaväelased","Tööandja":"Kaitsevägi"},{"Elukoha omavalitsuse väli":"Kadrina vald","Sugu":"Mehed","Sünniaasta":1995,"Vanus":30,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Kastre vald","Sugu":"Mehed","Sünniaasta":1974,"Vanus":52,"Osaleja haridustase":"kõrgharidus","Amet":"Juhid","Tööandja":"Sihtasutus Tartu 2024"},{"Elukoha omavalitsuse väli":"Keila linn","Sugu":"Mehed","Sünniaasta":1988,"Vanus":37,"Osaleja haridustase":"kõrgharidus","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"OSAÜHING FORSS"},{"Elukoha omavalitsuse väli":"Kohila vald","Sugu":"Mehed","Sünniaasta":1984,"Vanus":41,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Kose vald","Sugu":"Mehed","Sünniaasta":1975,"Vanus":50,"Osaleja haridustase":"kõrgharidus","Amet":"Teenindus- ja müügitöötajad","Tööandja":"Aktsiaselts Stallion"},{"Elukoha omavalitsuse väli":"Kuusalu vald","Sugu":"Mehed","Sünniaasta":1991,"Vanus":34,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Juhid","Tööandja":"GoDrive OÜ"},{"Elukoha omavalitsuse väli":"Kuusalu vald","Sugu":"Naised","Sünniaasta":1986,"Vanus":40,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Lääneranna vald","Sugu":"Mehed","Sünniaasta":1975,"Vanus":51,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"Osaühing Kvaliteetaken"},{"Elukoha omavalitsuse väli":"Lüganuse vald","Sugu":"Mehed","Sünniaasta":1988,"Vanus":37,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"Viru Vangla"},{"Elukoha omavalitsuse väli":"Luunja vald","Sugu":"Naised","Sünniaasta":2000,"Vanus":25,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Luunja vald","Sugu":"Naised","Sünniaasta":1993,"Vanus":32,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"Stebby OÜ"},{"Elukoha omavalitsuse väli":"Luunja vald","Sugu":"Naised","Sünniaasta":1986,"Vanus":39,"Osaleja haridustase":"kõrgharidus","Amet":"Pikaajaline töötu (kuni 24-aastased > 6 kuud, 25 ja vanemad > 12 kuud)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Mulgi vald","Sugu":"Naised","Sünniaasta":1974,"Vanus":51,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Mustvee vald","Sugu":"Naised","Sünniaasta":1976,"Vanus":50,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Nõo vald","Sugu":"Naised","Sünniaasta":1990,"Vanus":36,"Osaleja haridustase":"kõrgharidus","Amet":"Juhid","Tööandja":"Taimtip OÜ"},{"Elukoha omavalitsuse väli":"Nõo vald","Sugu":"Mehed","Sünniaasta":1998,"Vanus":27,"Osaleja haridustase":"kõrgharidus","Amet":"Sõjaväelased","Tööandja":"Kaitsevägi"},{"Elukoha omavalitsuse väli":"Paide linn","Sugu":"Mehed","Sünniaasta":2001,"Vanus":25,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Oskus- ja käsitöölised","Tööandja":"Jalgpalliklubi Paide Linnameeskond"},{"Elukoha omavalitsuse väli":"Paide linn","Sugu":"Mehed","Sünniaasta":2004,"Vanus":22,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"Tallinna Tehnikaülikool"},{"Elukoha omavalitsuse väli":"Paide linn","Sugu":"Mehed","Sünniaasta":1984,"Vanus":41,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Põlva vald","Sugu":"Mehed","Sünniaasta":1990,"Vanus":35,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Oskus- ja käsitöölised","Tööandja":"Strove OÜ"},{"Elukoha omavalitsuse väli":"Põlva vald","Sugu":"Naised","Sünniaasta":1991,"Vanus":35,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Põlva vald","Sugu":"Naised","Sünniaasta":1995,"Vanus":30,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"Päästeamet"},{"Elukoha omavalitsuse väli":"Raasiku vald","Sugu":"Mehed","Sünniaasta":1989,"Vanus":36,"Osaleja haridustase":"kõrgharidus","Amet":"Oskus- ja käsitöölised","Tööandja":"AS All Media Eesti"},{"Elukoha omavalitsuse väli":"Raasiku vald","Sugu":"Naised","Sünniaasta":1996,"Vanus":30,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"AS LHV Pank"},{"Elukoha omavalitsuse väli":"Rae vald","Sugu":"Mehed","Sünniaasta":1983,"Vanus":42,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Rae vald","Sugu":"Mehed","Sünniaasta":1988,"Vanus":37,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Rae vald","Sugu":"Naised","Sünniaasta":1986,"Vanus":39,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Rae vald","Sugu":"Mehed","Sünniaasta":1997,"Vanus":28,"Osaleja haridustase":"kõrgharidus","Amet":"Pikaajaline töötu (kuni 24-aastased > 6 kuud, 25 ja vanemad > 12 kuud)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Rae vald","Sugu":"Naised","Sünniaasta":1983,"Vanus":42,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Rakvere linn","Sugu":"Naised","Sünniaasta":1990,"Vanus":36,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Rakvere linn","Sugu":"Naised","Sünniaasta":1986,"Vanus":39,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Rakvere linn","Sugu":"Mehed","Sünniaasta":1997,"Vanus":29,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"Transpordiamet"},{"Elukoha omavalitsuse väli":"Rapla vald","Sugu":"Mehed","Sünniaasta":1998,"Vanus":27,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Rapla vald","Sugu":"Mehed","Sünniaasta":1982,"Vanus":44,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"Aktsiaselts BCS Itera"},{"Elukoha omavalitsuse väli":"Rõuge vald","Sugu":"Mehed","Sünniaasta":1985,"Vanus":40,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"OÜ Revolutsioon"},{"Elukoha omavalitsuse väli":"Saku vald","Sugu":"Mehed","Sünniaasta":1990,"Vanus":36,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Saue vald","Sugu":"Mehed","Sünniaasta":1979,"Vanus":46,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Saue vald","Sugu":"Mehed","Sünniaasta":1991,"Vanus":34,"Osaleja haridustase":"kõrgharidus","Amet":"Lihttöölised","Tööandja":"Greiner Packaging Aktsiaselts"},{"Elukoha omavalitsuse väli":"Saue vald","Sugu":"Naised","Sünniaasta":1991,"Vanus":34,"Osaleja haridustase":"kõrgharidus","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"Quant Estonia OÜ"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1998,"Vanus":27,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":2002,"Vanus":23,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1993,"Vanus":32,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1990,"Vanus":35,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"AS LHV Pank"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1995,"Vanus":31,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Oskus- ja käsitöölised","Tööandja":"AS Prisma Peremarket"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1998,"Vanus":28,"Osaleja haridustase":"kõrgharidus","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"AS LHV Pank"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1994,"Vanus":31,"Osaleja haridustase":"kõrgharidus","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"Neuma Translations OÜ"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":2002,"Vanus":23,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1992,"Vanus":33,"Osaleja haridustase":"kõrgharidus","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"Telia Eesti AS"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":2002,"Vanus":24,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"Jalgpalliklubi Tabasalu"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1977,"Vanus":48,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1990,"Vanus":35,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1987,"Vanus":38,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1987,"Vanus":39,"Osaleja haridustase":"kõrgharidus","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"Marabu Airlines OÜ"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1999,"Vanus":26,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1989,"Vanus":37,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"Wise Payments Limited Eesti filiaal"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":2001,"Vanus":24,"Osaleja haridustase":"kõrgharidus","Amet":"Muud pedagoogika tippspetsialistid","Tööandja":"Jalgpalliklubi FCF Jalgpallikool"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1988,"Vanus":37,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1984,"Vanus":42,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1982,"Vanus":44,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"Alexela Motors AS"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1987,"Vanus":38,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1991,"Vanus":34,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1999,"Vanus":26,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"Aktsiaselts Ida-Tallinna Keskhaigla"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1991,"Vanus":35,"Osaleja haridustase":"kõrgharidus","Amet":"Teenindus- ja müügitöötajad","Tööandja":"AS Tallinna Kontserdimaja"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1983,"Vanus":43,"Osaleja haridustase":"kõrgharidus","Amet":"Pikaajaline töötu (kuni 24-aastased > 6 kuud, 25 ja vanemad > 12 kuud)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1986,"Vanus":39,"Osaleja haridustase":"kõrgharidus","Amet":"Põhikooli (1.-9. klass) õpetajad","Tööandja":"Ruila Põhikool"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1974,"Vanus":52,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Lihttöölised","Tööandja":"Chillius OÜ"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1997,"Vanus":28,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"Mittetulundusühing TRIATLONIKLUBI 21. CC"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":2001,"Vanus":24,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"Ankord OÜ"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1981,"Vanus":44,"Osaleja haridustase":"kõrgharidus","Amet":"Oskus- ja käsitöölised","Tööandja":"TRRV Ehitus OÜ"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1988,"Vanus":38,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1974,"Vanus":51,"Osaleja haridustase":"kõrgharidus","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"Spring Design OÜ"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1992,"Vanus":34,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"Lunami OÜ"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1982,"Vanus":44,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":2001,"Vanus":24,"Osaleja haridustase":"kõrgharidus","Amet":"Teenindus- ja müügitöötajad","Tööandja":"Kaevukohvik OÜ"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1998,"Vanus":28,"Osaleja haridustase":"kõrgharidus","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"AS LHV Pank"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1985,"Vanus":40,"Osaleja haridustase":"kõrgharidus","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"Harno"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1980,"Vanus":45,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"Minimalist OÜ"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1995,"Vanus":30,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1982,"Vanus":44,"Osaleja haridustase":"kõrgharidus","Amet":"Koolieelse lasteasutuse õpetajad","Tööandja":"MTÜ ASÕP"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":2003,"Vanus":22,"Osaleja haridustase":"kõrgharidus","Amet":"Sotsiaal- ja noorsootöötajad, nõustajad","Tööandja":"Ujumisklubi Briis"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1989,"Vanus":36,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1997,"Vanus":29,"Osaleja haridustase":"kõrgharidus","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"Tallinna Keskraamatukogu"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1999,"Vanus":26,"Osaleja haridustase":"kõrgharidus","Amet":"Sõjaväelased","Tööandja":"Päästeamet"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1990,"Vanus":35,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1972,"Vanus":53,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1999,"Vanus":26,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1987,"Vanus":38,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"TTT OÜ"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1994,"Vanus":32,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1979,"Vanus":46,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"OÜ Axmer Group"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1988,"Vanus":37,"Osaleja haridustase":"kõrgharidus","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1981,"Vanus":44,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Töötu","Tööandja":"Eesti Töötukassa"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1969,"Vanus":57,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1999,"Vanus":26,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1993,"Vanus":32,"Osaleja haridustase":"kõrgharidus","Amet":"Teenindus- ja müügitöötajad","Tööandja":"Norstat Eesti AS"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1983,"Vanus":42,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1988,"Vanus":38,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"Tallinna Tehnikakõrgkool"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1995,"Vanus":31,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":2000,"Vanus":25,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Teenindus- ja müügitöötajad","Tööandja":"Delfi Meedia AS"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1988,"Vanus":38,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"Tele2 Eesti Aktsiaselts"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1979,"Vanus":46,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1995,"Vanus":30,"Osaleja haridustase":"kõrgharidus","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"Eesti Punane Rist"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1989,"Vanus":36,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"Sihtasutus Eesti Mälu Instituut"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1983,"Vanus":42,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"Elektrilevi OÜ"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1998,"Vanus":27,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"sihtasutus Põhja-Eesti Regionaalhaigla"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1988,"Vanus":37,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1974,"Vanus":51,"Osaleja haridustase":"kõrgharidus","Amet":"Põhikooli (1.-9. klass) õpetajad","Tööandja":"Laagri Kool"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1988,"Vanus":38,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1995,"Vanus":31,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1999,"Vanus":26,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1986,"Vanus":39,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":2006,"Vanus":19,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1981,"Vanus":44,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"NORD PROJEKT OÜ"},{"Elukoha omavalitsuse väli":"Tapa vald","Sugu":"Naised","Sünniaasta":1978,"Vanus":47,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"Kaitsevägi"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Mehed","Sünniaasta":1986,"Vanus":39,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Mehed","Sünniaasta":1997,"Vanus":29,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Naised","Sünniaasta":2000,"Vanus":26,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Mehed","Sünniaasta":1987,"Vanus":38,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Mehed","Sünniaasta":1983,"Vanus":43,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"Tartu Herbert Masingu Kool"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Mehed","Sünniaasta":1994,"Vanus":31,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Naised","Sünniaasta":1982,"Vanus":44,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Mehed","Sünniaasta":2000,"Vanus":25,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Juhid","Tööandja":"Dokobit, UAB"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Naised","Sünniaasta":1987,"Vanus":38,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"Tartu võimlemisklubi „ Rütmika\" Võimlemiskool"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Mehed","Sünniaasta":1975,"Vanus":51,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"OÜ Kavestar"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Naised","Sünniaasta":1997,"Vanus":28,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Naised","Sünniaasta":2002,"Vanus":23,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Naised","Sünniaasta":1984,"Vanus":42,"Osaleja haridustase":"kõrgharidus","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"Concentrix Estonia OÜ"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Mehed","Sünniaasta":1982,"Vanus":43,"Osaleja haridustase":"kõrgharidus","Amet":"Juhid","Tööandja":"AS Medita"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Mehed","Sünniaasta":1991,"Vanus":34,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Juhid","Tööandja":"Kodumaja Projekteerimise OÜ"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Mehed","Sünniaasta":1991,"Vanus":35,"Osaleja haridustase":"kõrgharidus","Amet":"Lihttöölised","Tööandja":"sihtasutus Tartu Ülikooli Kliinikum"},{"Elukoha omavalitsuse väli":"Tartu vald","Sugu":"Mehed","Sünniaasta":1982,"Vanus":43,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"Alpi Eesti OÜ"},{"Elukoha omavalitsuse väli":"Tartu vald","Sugu":"Mehed","Sünniaasta":1988,"Vanus":38,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"Testlio OÜ"},{"Elukoha omavalitsuse väli":"Tartu vald","Sugu":"Mehed","Sünniaasta":1980,"Vanus":45,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tori vald","Sugu":"Naised","Sünniaasta":1992,"Vanus":33,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Väike-Maarja vald","Sugu":"Mehed","Sünniaasta":2002,"Vanus":23,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"Tartu Rakenduslik Kolledž (VOCO)"},{"Elukoha omavalitsuse väli":"Viimsi vald","Sugu":"Mehed","Sünniaasta":1985,"Vanus":41,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"Emotive OÜ"},{"Elukoha omavalitsuse väli":"Viimsi vald","Sugu":"Naised","Sünniaasta":2002,"Vanus":23,"Osaleja haridustase":"kõrgharidus","Amet":"Lihttöölised","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Viljandi linn","Sugu":"Mehed","Sünniaasta":1974,"Vanus":51,"Osaleja haridustase":"kõrgharidus","Amet":"Juhid","Tööandja":"Ottonator OÜ"},{"Elukoha omavalitsuse väli":"Võru linn","Sugu":"Mehed","Sünniaasta":1996,"Vanus":29,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Võru linn","Sugu":"Mehed","Sünniaasta":1995,"Vanus":31,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Võru linn","Sugu":"Mehed","Sünniaasta":2000,"Vanus":25,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Võru linn","Sugu":"Mehed","Sünniaasta":1981,"Vanus":45,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Juhid","Tööandja":"Maksu- ja Tolliamet"},{"Elukoha omavalitsuse väli":"Võru vald","Sugu":"Naised","Sünniaasta":1978,"Vanus":47,"Osaleja haridustase":"kõrgharidus","Amet":"Pikaajaline töötu (kuni 24-aastased > 6 kuud, 25 ja vanemad > 12 kuud)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Võru vald","Sugu":"Naised","Sünniaasta":1993,"Vanus":32,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"GPV Estonia AS"},{"Elukoha omavalitsuse väli":"","Sugu":"Mehed","Sünniaasta":1983,"Vanus":43,"Osaleja haridustase":"","Amet":"IKT projektijuht","Tööandja":"BLRT Refonda Baltic OÜ"},{"Elukoha omavalitsuse väli":"","Sugu":"Mehed","Sünniaasta":1982,"Vanus":44,"Osaleja haridustase":"","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"Directo OÜ"},{"Elukoha omavalitsuse väli":"","Sugu":"Mehed","Sünniaasta":1992,"Vanus":34,"Osaleja haridustase":"","Amet":"Määramata","Tööandja":""},{"Elukoha omavalitsuse väli":"","Sugu":"Naised","Sünniaasta":1982,"Vanus":43,"Osaleja haridustase":"","Amet":"Määramata","Tööandja":""},{"Elukoha omavalitsuse väli":"","Sugu":"Mehed","Sünniaasta":2006,"Vanus":19,"Osaleja haridustase":"","Amet":"Määramata","Tööandja":""},{"Elukoha omavalitsuse väli":"Võru linn","Sugu":"Mehed","Sünniaasta":1990,"Vanus":35,"Osaleja haridustase":"kõrgharidus","Amet":"Põllumajanduse, metsanduse, kalanduse ja jahinduse oskustöölised","Tööandja":"OÜ DIKSOONIA"},{"Elukoha omavalitsuse väli":"Keila linn","Sugu":"Naised","Sünniaasta":1991,"Vanus":34,"Osaleja haridustase":"kõrgharidus","Amet":"Teenindus- ja müügitöötajad","Tööandja":"LaSpa Group OÜ"},{"Elukoha omavalitsuse väli":"Saku vald","Sugu":"Naised","Sünniaasta":1989,"Vanus":37,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Tippspetsialistid","Tööandja":"Wise Payments Limited Eesti filiaal"},{"Elukoha omavalitsuse väli":"Jõelähtme vald","Sugu":"Naised","Sünniaasta":1987,"Vanus":39,"Osaleja haridustase":"kõrgharidus","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"Kaitseressursside Amet"},{"Elukoha omavalitsuse väli":"Võru linn","Sugu":"Mehed","Sünniaasta":1997,"Vanus":28,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Lihttöölised","Tööandja":"Baltic Defence & Technology OÜ"},{"Elukoha omavalitsuse väli":"Põlva vald","Sugu":"Naised","Sünniaasta":1996,"Vanus":29,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Mehed","Sünniaasta":1976,"Vanus":49,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"Roheline Laine OÜ"},{"Elukoha omavalitsuse väli":"Keila linn","Sugu":"Naised","Sünniaasta":1990,"Vanus":35,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Rapla vald","Sugu":"Mehed","Sünniaasta":1997,"Vanus":29,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Pikaajaline töötu (kuni 24-aastased > 6 kuud, 25 ja vanemad > 12 kuud)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Viljandi vald","Sugu":"Mehed","Sünniaasta":1977,"Vanus":49,"Osaleja haridustase":"kõrgharidus","Amet":"Muud pedagoogika tippspetsialistid","Tööandja":"Tartu Ülikooli Viljandi Kultuuriakadeemia"},{"Elukoha omavalitsuse väli":"Viimsi vald","Sugu":"Naised","Sünniaasta":1991,"Vanus":34,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Luunja vald","Sugu":"Naised","Sünniaasta":1993,"Vanus":33,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"Swedbank AS"},{"Elukoha omavalitsuse väli":"Hiiumaa vald","Sugu":"Mehed","Sünniaasta":1977,"Vanus":48,"Osaleja haridustase":"kõrgharidus","Amet":"Juhid","Tööandja":"Osaühing Liisbet Tukat"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1992,"Vanus":33,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Mehed","Sünniaasta":1987,"Vanus":38,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Maardu linn","Sugu":"Naised","Sünniaasta":1986,"Vanus":40,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Võru linn","Sugu":"Naised","Sünniaasta":1989,"Vanus":36,"Osaleja haridustase":"kõrgharidus","Amet":"Pikaajaline töötu (kuni 24-aastased > 6 kuud, 25 ja vanemad > 12 kuud)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1975,"Vanus":50,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"Roosipere osaühing"},{"Elukoha omavalitsuse väli":"Viimsi vald","Sugu":"Naised","Sünniaasta":1983,"Vanus":42,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Türi vald","Sugu":"Naised","Sünniaasta":1988,"Vanus":37,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Võru linn","Sugu":"Naised","Sünniaasta":1975,"Vanus":51,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"Aktsiaselts Kagu-Eesti Turvas"},{"Elukoha omavalitsuse väli":"Märjamaa vald","Sugu":"Naised","Sünniaasta":1990,"Vanus":36,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"Kaitseressursside Amet"},{"Elukoha omavalitsuse väli":"Rapla vald","Sugu":"Naised","Sünniaasta":1974,"Vanus":51,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"OÜ Klots"},{"Elukoha omavalitsuse väli":"Keila linn","Sugu":"Naised","Sünniaasta":1999,"Vanus":26,"Osaleja haridustase":"kõrgharidus","Amet":"Juhid","Tööandja":"Sandmani Grupi Aktsiaselts"},{"Elukoha omavalitsuse väli":"Saaremaa vald","Sugu":"Mehed","Sünniaasta":1987,"Vanus":38,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Saue vald","Sugu":"Mehed","Sünniaasta":1972,"Vanus":53,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"Politsei- ja Piirivalveamet"},{"Elukoha omavalitsuse väli":"Tartu vald","Sugu":"Naised","Sünniaasta":1970,"Vanus":55,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1976,"Vanus":49,"Osaleja haridustase":"kõrgharidus","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"Sotsiaalkindlustusamet"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1997,"Vanus":29,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Võru linn","Sugu":"Mehed","Sünniaasta":2001,"Vanus":24,"Osaleja haridustase":"kõrgharidus","Amet":"Sotsiaal- ja noorsootöötajad, nõustajad","Tööandja":"Sihtasutus Võrumaa Arenduskeskus"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1972,"Vanus":53,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1984,"Vanus":41,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1990,"Vanus":35,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1979,"Vanus":47,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Saaremaa vald","Sugu":"Mehed","Sünniaasta":1986,"Vanus":39,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Pärnu linn","Sugu":"Mehed","Sünniaasta":1968,"Vanus":57,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1987,"Vanus":38,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"Tallinna Filharmoonia"},{"Elukoha omavalitsuse väli":"Maardu linn","Sugu":"Mehed","Sünniaasta":1992,"Vanus":33,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1980,"Vanus":46,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1983,"Vanus":42,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1984,"Vanus":41,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"PSI CRO OSAÜHING"},{"Elukoha omavalitsuse väli":"Kambja vald","Sugu":"Mehed","Sünniaasta":1997,"Vanus":29,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Kohtla-Järve linn","Sugu":"Naised","Sünniaasta":1989,"Vanus":36,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"Osaühing STAKO DILER"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Mehed","Sünniaasta":1980,"Vanus":45,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"Osaühing Rumma & Ko"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1983,"Vanus":42,"Osaleja haridustase":"kõrgharidus","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1977,"Vanus":48,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"Duva Trade OÜ"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1979,"Vanus":47,"Osaleja haridustase":"kõrgharidus","Amet":"Juhid","Tööandja":"OÜ Enbit"},{"Elukoha omavalitsuse väli":"Harku vald","Sugu":"Mehed","Sünniaasta":1996,"Vanus":30,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1988,"Vanus":37,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Rae vald","Sugu":"Naised","Sünniaasta":1976,"Vanus":50,"Osaleja haridustase":"kutsekeskharidus või kutseharidus või keskeri-/ tehnikumiharidus pärast üldkeskharidust","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"Tallinna Kiirabi"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Mehed","Sünniaasta":1978,"Vanus":47,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"","Sugu":"Mehed","Sünniaasta":1965,"Vanus":61,"Osaleja haridustase":"","Amet":"Määramata","Tööandja":""},{"Elukoha omavalitsuse väli":"Viimsi vald","Sugu":"Mehed","Sünniaasta":1973,"Vanus":53,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Saku vald","Sugu":"Mehed","Sünniaasta":2002,"Vanus":23,"Osaleja haridustase":"kõrgharidus","Amet":"Töötu","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1992,"Vanus":34,"Osaleja haridustase":"kõrgharidus","Amet":"Juhid","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Viimsi vald","Sugu":"Mehed","Sünniaasta":1991,"Vanus":34,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"OÜ AquaArteesia"},{"Elukoha omavalitsuse väli":"Rõuge vald","Sugu":"Naised","Sünniaasta":1987,"Vanus":38,"Osaleja haridustase":"kõrgharidus","Amet":"Tööturul mitteaktiivne (pensionär, lapsehooldupuhkusel viibiv vanem, tööotsija, või muul põhjusel tööl mittekäiv isik)","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1989,"Vanus":36,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Kontoritöötajad ja klienditeenindajad","Tööandja":"mittetulundusühing Keeltekool In Down-Town"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Naised","Sünniaasta":1997,"Vanus":28,"Osaleja haridustase":"kõrgharidus","Amet":"Juhid","Tööandja":"Since 95 OÜ"},{"Elukoha omavalitsuse väli":"Tori vald","Sugu":"Mehed","Sünniaasta":1989,"Vanus":36,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"Päästeamet"},{"Elukoha omavalitsuse väli":"Tartu linn","Sugu":"Mehed","Sünniaasta":1995,"Vanus":31,"Osaleja haridustase":"kõrgharidus","Amet":"Tippspetsialistid","Tööandja":"RSVentures OÜ"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1980,"Vanus":46,"Osaleja haridustase":"kõrgharidus","Amet":"Juhid","Tööandja":"asutusega seos puudub"},{"Elukoha omavalitsuse väli":"Harku vald","Sugu":"Mehed","Sünniaasta":1998,"Vanus":27,"Osaleja haridustase":"kõrgharidus","Amet":"Lihttöölised","Tööandja":"Politsei- ja Piirivalveamet"},{"Elukoha omavalitsuse väli":"Tallinn","Sugu":"Mehed","Sünniaasta":1994,"Vanus":32,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Muud pedagoogika tippspetsialistid","Tööandja":"SP Productions OÜ"},{"Elukoha omavalitsuse väli":"Võru vald","Sugu":"Mehed","Sünniaasta":2002,"Vanus":24,"Osaleja haridustase":"üldkeskharidus (gümnaasium, 11 või 12 klassi)","Amet":"Tehnikud ja keskastme spetsialistid","Tööandja":"OÜ Cristella VT"}]
+  }
+};
+
+const validateDataPeriod = () => {
+  const periods = [reportData.overview.period, reportData.education.period, reportData.location.period, reportData.newData.period];
+  const uniquePeriods = [...new Set(periods)];
+  if (uniquePeriods.length !== 1) {
+    console.warn('Perioodid ei kattu:', periods);
+  }
+};
+
+const calcYAxisMax = (datasets, minimum = 0) => {
+  const maxValue = Math.max(...datasets.flatMap(set => set.data));
+  const padded = Math.ceil((maxValue + 5) / 5) * 5;
+  return Math.max(minimum, padded);
+};
+
+const formatGender = ([male, female]) => `${male}% / ${female}%`;
+const pctDiff = (a, b) => (a - b).toFixed(1).replace('.', ',');
+
+const participantsRegionMap = {
+  'Tallinn': 'Tallinn',
+  'Harku vald': 'Harjumaa (v.a Tallinn)',
+  'Keila linn': 'Harjumaa (v.a Tallinn)',
+  'Kose vald': 'Harjumaa (v.a Tallinn)',
+  'Kuusalu vald': 'Harjumaa (v.a Tallinn)',
+  'Raasiku vald': 'Harjumaa (v.a Tallinn)',
+  'Rae vald': 'Harjumaa (v.a Tallinn)',
+  'Saku vald': 'Harjumaa (v.a Tallinn)',
+  'Saue vald': 'Harjumaa (v.a Tallinn)',
+  'Viimsi vald': 'Harjumaa (v.a Tallinn)',
+  'Haljala vald': 'Ida Eesti',
+  'Jõhvi vald': 'Ida Eesti',
+  'Kadrina vald': 'Ida Eesti',
+  'Lüganuse vald': 'Ida Eesti',
+  'Rakvere linn': 'Ida Eesti',
+  'Tapa vald': 'Ida Eesti',
+  'Väike-Maarja vald': 'Ida Eesti',
+  'Mustvee vald': 'Ida Eesti',
+  'Antsla vald': 'Lõuna Eesti',
+  'Kastre vald': 'Lõuna Eesti',
+  'Luunja vald': 'Lõuna Eesti',
+  'Mulgi vald': 'Lõuna Eesti',
+  'Nõo vald': 'Lõuna Eesti',
+  'Põlva vald': 'Lõuna Eesti',
+  'Rõuge vald': 'Lõuna Eesti',
+  'Tartu linn': 'Lõuna Eesti',
+  'Tartu vald': 'Lõuna Eesti',
+  'Viljandi linn': 'Lõuna Eesti',
+  'Võru linn': 'Lõuna Eesti',
+  'Võru vald': 'Lõuna Eesti',
+  'Haapsalu linn': 'Lääne Eesti ja saared',
+  'Kohila vald': 'Lääne Eesti ja saared',
+  'Lääneranna vald': 'Lääne Eesti ja saared',
+  'Paide linn': 'Lääne Eesti ja saared',
+  'Rapla vald': 'Lääne Eesti ja saared',
+  'Tori vald': 'Lääne Eesti ja saared'
+};
+
+const participantRegionLabels = ['Tallinn', 'Harjumaa (v.a Tallinn)', 'Ida Eesti', 'Lõuna Eesti', 'Lääne Eesti ja saared', 'Teadmata'];
+const participantAgeGroups = [
+  { label: '19–24', min: 19, max: 24 },
+  { label: '25–34', min: 25, max: 34 },
+  { label: '35–44', min: 35, max: 44 },
+  { label: '45+', min: 45, max: Infinity }
+];
+const participantEducationLabels = ['Kõrgharidus', 'Üldkeskharidus', 'Kutse-/keskeriharidus', 'Kutseharidus pärast põhiharidust', 'Teadmata'];
+const participantOccupationLabels = ['Töötud', 'Mitteaktiivsed', 'Spetsialistid ja juhid', 'Kontori- ja teenindustöö', 'Haridus / sotsiaalvaldkond', 'Oskus-, liht- ja kaitsevaldkonna töö', 'Määramata'];
+const participantSectorLabels = ['Erasektor', 'Avalik sektor', 'Kolmas sektor', 'Seos puudub / teadmata'];
+const participantReferenceDate = new Date('2026-04-28T00:00:00');
+const participantColors = {
+  blue: '#232830',   // //kood ink — primary series (label: "Lõpetajad" / dominant)
+  green: '#DCF900',  // //kood signal yellow-green — secondary, sits next to ink
+  rose: '#56CAF5',   // //kood sky — tertiary
+  sand: '#B5B8BB',   // //kood grey — quaternary / Teadmata
+  ink: '#232830',
+  gold: '#FF9D5A'    // //kood neon orange — fifth slot
+};
+
+const cleanParticipantValue = value => {
+  if (value === null || value === undefined) return 'Teadmata';
+  const text = String(value).trim();
+  return text ? text : 'Teadmata';
+};
+
+const normalizeMunicipalityName = value => cleanParticipantValue(value)
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/['’`]/g, '')
+  .replace(/-/g, ' ')
+  .replace(/[^a-zA-Z0-9 ]/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim()
+  .toLowerCase();
+
+const municipalityAliasMap = {
+  [normalizeMunicipalityName('Tallinna linn')]: 'Tallinn',
+  [normalizeMunicipalityName('Tallinn linn')]: 'Tallinn',
+  [normalizeMunicipalityName('Tartu')]: 'Tartu linn',
+  [normalizeMunicipalityName('Narva')]: 'Narva linn',
+  [normalizeMunicipalityName('Pärnu')]: 'Pärnu linn',
+  [normalizeMunicipalityName('Kohtla Järve')]: 'Kohtla-Järve linn',
+  [normalizeMunicipalityName('Kohtla Jarve')]: 'Kohtla-Järve linn',
+  [normalizeMunicipalityName('Viljandi')]: 'Viljandi linn',
+  [normalizeMunicipalityName('Rakvere')]: 'Rakvere linn',
+  [normalizeMunicipalityName('Võru')]: 'Võru linn',
+  [normalizeMunicipalityName('Voru')]: 'Võru linn',
+  [normalizeMunicipalityName('Haapsalu')]: 'Haapsalu linn',
+  [normalizeMunicipalityName('Paide')]: 'Paide linn',
+  [normalizeMunicipalityName('Keila')]: 'Keila linn'
+};
+
+const canonicalizeMunicipality = value => {
+  const normalized = normalizeMunicipalityName(value);
+  if (!normalized || normalized === 'teadmata') return 'Teadmata';
+  if (municipalityAliasMap[normalized]) return municipalityAliasMap[normalized];
+
+  const withoutAdminSuffix = normalized.replace(/\b(linn|vald)\b/g, '').replace(/\s+/g, ' ').trim();
+  if (municipalityAliasMap[withoutAdminSuffix]) return municipalityAliasMap[withoutAdminSuffix];
+  if (!withoutAdminSuffix) return 'Teadmata';
+
+  const startsWithTallinn = withoutAdminSuffix === normalizeMunicipalityName('Tallinn');
+  if (startsWithTallinn) return 'Tallinn';
+  return withoutAdminSuffix.split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ') + (normalized.includes(' vald') ? ' vald' : normalized.includes(' linn') ? ' linn' : '');
+};
+
+const extractMunicipalityEhak = value => {
+  const match = String(value ?? '').match(/\b(\d{4})\b/);
+  return match ? match[1] : null;
+};
+
+// Demograafilised väljad (sugu, vanus, sünniaasta) on eelnevalt välja arvutatud
+// ja salvestatud osaleja kirjesse. Isikukoode HTML failis enam ei hoiustata
+// privaatsuse kaalutlustel — vt UPDATE_INSTRUCTIONS.md jaotis 6.
+//
+// Kui andmestikus peaks ajalooliselt esinema veel toores Isikukood (legacy fallback),
+// arvutame välja sama loogikaga nagu varem. Praktikas seda enam ei juhtu.
+const normalizeGender = value => {
+  const text = cleanParticipantValue(value);
+  if (text === 'Mehed' || text === 'Naised' || text === 'Teadmata') return text;
+  return 'Teadmata';
+};
+
+const parseEstonianIdLegacy = idCode => {
+  const cleaned = cleanParticipantValue(idCode).replace(/\.0$/, '');
+  const digits = cleaned.replace(/\D/g, '');
+  if (digits.length !== 11) return { gender: 'Teadmata', age: null, birthYear: null };
+  const first = Number(digits[0]);
+  const century = ({ 1: 1800, 2: 1800, 3: 1900, 4: 1900, 5: 2000, 6: 2000 })[first];
+  if (!century) return { gender: 'Teadmata', age: null, birthYear: null };
+  const gender = first === 3 || first === 5 ? 'Mehed' : first === 4 || first === 6 ? 'Naised' : 'Teadmata';
+  const year = century + Number(digits.slice(1, 3));
+  const month = Number(digits.slice(3, 5));
+  const day = Number(digits.slice(5, 7));
+  const birthDate = new Date(year, month - 1, day);
+  if (Number.isNaN(birthDate.getTime()) || birthDate.getMonth() !== month - 1 || birthDate.getDate() !== day) {
+    return { gender, age: null, birthYear: null };
+  }
+  let age = participantReferenceDate.getFullYear() - birthDate.getFullYear();
+  const monthDiff = participantReferenceDate.getMonth() - birthDate.getMonth();
+  const dayDiff = participantReferenceDate.getDate() - birthDate.getDate();
+  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) age -= 1;
+  return { gender, age, birthYear: year };
+};
+
+const readDemographics = row => {
+  // Eelarvutatud väljade lugemine — eelistatud tee.
+  if ('Sugu' in row || 'Vanus' in row || 'Sünniaasta' in row) {
+    const ageRaw = row['Vanus'];
+    const yearRaw = row['Sünniaasta'];
+    return {
+      gender: normalizeGender(row['Sugu']),
+      age: Number.isFinite(ageRaw) ? ageRaw : (typeof ageRaw === 'string' && ageRaw.trim() && Number.isFinite(Number(ageRaw)) ? Number(ageRaw) : null),
+      birthYear: Number.isFinite(yearRaw) ? yearRaw : (typeof yearRaw === 'string' && yearRaw.trim() && Number.isFinite(Number(yearRaw)) ? Number(yearRaw) : null)
+    };
+  }
+  // Legacy fallback: kui kogemata satub kirje toore isikukoodiga, töötame ikkagi.
+  if ('Isikukood' in row) {
+    return parseEstonianIdLegacy(row['Isikukood']);
+  }
+  return { gender: 'Teadmata', age: null, birthYear: null };
+};
+
+const determineRegion = municipality => participantsRegionMap[municipality] || 'Teadmata';
+
+const normalizeEducation = value => {
+  const lowered = cleanParticipantValue(value).toLowerCase();
+  if (lowered === 'teadmata') return 'Teadmata';
+  if (lowered.includes('kõrgharidus')) return 'Kõrgharidus';
+  if (lowered.includes('pärast põhiharidust')) return 'Kutseharidus pärast põhiharidust';
+  if (lowered.includes('kutse') || lowered.includes('keskeri') || lowered.includes('tehnikum')) return 'Kutse-/keskeriharidus';
+  if (lowered.includes('üldkeskharidus')) return 'Üldkeskharidus';
+  return 'Teadmata';
+};
+
+const groupOccupation = value => {
+  const lowered = cleanParticipantValue(value).toLowerCase();
+  if (lowered === 'teadmata' || lowered === 'määramata') return 'Määramata';
+  if (lowered === 'töötu' || lowered.includes('pikaajaline töötu')) return 'Töötud';
+  if (lowered.includes('mitteaktiivne')) return 'Mitteaktiivsed';
+  if (['juhid', 'tippspetsialistid', 'ikt projektijuht'].includes(lowered) || lowered.includes('tehnikud ja keskastme spetsialistid')) return 'Spetsialistid ja juhid';
+  if (lowered.includes('kontoritöötajad') || lowered.includes('teenindus- ja müügitöötajad')) return 'Kontori- ja teenindustöö';
+  if (lowered.includes('õpetajad') || lowered.includes('pedagoogika') || lowered.includes('sotsiaal- ja noorsootöötajad')) return 'Haridus / sotsiaalvaldkond';
+  if (lowered.includes('oskus- ja käsitöölised') || lowered.includes('lihttöölised') || lowered.includes('sõjaväelased')) return 'Oskus-, liht- ja kaitsevaldkonna töö';
+  return 'Määramata';
+};
+
+const classifyEmployerSector = value => {
+  const lowered = cleanParticipantValue(value).toLowerCase();
+  if (lowered === 'teadmata' || lowered.includes('asutusega seos puudub')) return 'Seos puudub / teadmata';
+  const thirdSectorKeywords = ['mtü', 'mittetulundusühing', 'sihtasutus', 'klubi'];
+  const publicSectorKeywords = ['amet', 'kaitsevägi', 'harno', 'töötukassa', 'vangla', 'kool', 'kolledž', 'ülikool', 'haigla', 'kliinikum', 'ministeerium', 'lasteaed', 'vallavalitsus', 'linnavalitsus', 'rahvaraamatukogu', 'politsei'];
+  const privateSectorKeywords = ['oü', 'as', 'aktsiaselts', 'limited', 'uab', 'fie'];
+  if (thirdSectorKeywords.some(keyword => lowered.includes(keyword))) return 'Kolmas sektor';
+  if (publicSectorKeywords.some(keyword => lowered.includes(keyword))) return 'Avalik sektor';
+  if (privateSectorKeywords.some(keyword => new RegExp(`(^|[\\s,.-])${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[\\s,.-])`, 'i').test(lowered))) return 'Erasektor';
+  return 'Erasektor';
+};
+
+const toCountMap = (items, labels, accessor) => Object.fromEntries(labels.map(label => [label, items.filter(item => accessor(item) === label).length]));
+const formatDecimal = value => String(value).replace('.', ',');
+const formatShare = (count, total) => total ? `${Math.round((count / total) * 100)}%` : '0%';
+
+const buildParticipantsOverview = rows => {
+  const normalizedRows = rows.map(row => {
+    const municipalityRaw = cleanParticipantValue(row['Elukoha omavalitsuse väli']);
+    const municipality = canonicalizeMunicipality(municipalityRaw);
+    const demo = readDemographics(row);
+    return {
+      municipalityRaw,
+      municipality,
+      municipalityNorm: normalizeMunicipalityName(municipality),
+      municipalityEhak: extractMunicipalityEhak(municipalityRaw),
+      region: determineRegion(municipality),
+      gender: demo.gender,
+      age: demo.age,
+      birthYear: demo.birthYear,
+      education: normalizeEducation(row['Osaleja haridustase']),
+      occupation: groupOccupation(row['Amet']),
+      employer: cleanParticipantValue(row['Tööandja']),
+      sector: classifyEmployerSector(row['Tööandja'])
+    };
+  });
+
+  const total = normalizedRows.length;
+  const knownAges = normalizedRows.map(row => row.age).filter(age => Number.isInteger(age) && age >= 19);
+  const ageSum = knownAges.reduce((sum, age) => sum + age, 0);
+  const avgAge = knownAges.length ? Number((ageSum / knownAges.length).toFixed(1)) : 0;
+  const sortedAges = [...knownAges].sort((a, b) => a - b);
+  const medianAge = sortedAges.length ? (sortedAges.length % 2 ? sortedAges[(sortedAges.length - 1) / 2] : (sortedAges[sortedAges.length / 2 - 1] + sortedAges[sortedAges.length / 2]) / 2) : 0;
+  const youngest = sortedAges[0] || 0;
+  const oldest = sortedAges[sortedAges.length - 1] || 0;
+
+  const knownMunicipalities = [...new Set(normalizedRows.map(row => row.municipality).filter(value => value !== 'Teadmata'))];
+  const uniqueOrganizations = [...new Set(normalizedRows.map(row => row.employer).filter(value => value !== 'Teadmata' && !value.toLowerCase().includes('asutusega seos puudub')))];
+
+  const regionCounts = toCountMap(normalizedRows, participantRegionLabels, row => row.region);
+  const municipalityCounts = normalizedRows.reduce((acc, row) => {
+    const key = row.municipality;
+    if (!acc[key]) {
+      acc[key] = { municipality: key, count: 0, normalizedName: row.municipalityNorm, ehak: row.municipalityEhak };
+    }
+    acc[key].count += 1;
+    if (!acc[key].ehak && row.municipalityEhak) acc[key].ehak = row.municipalityEhak;
+    return acc;
+  }, {});
+  const municipalPoints = Object.values(municipalityCounts).sort((a, b) => b.count - a.count);
+  const genderLabels = ['Mehed', 'Naised', 'Teadmata'];
+  const genderCounts = toCountMap(normalizedRows, genderLabels, row => row.gender);
+
+  const ageGroupCounts = Object.fromEntries(participantAgeGroups.map(group => [group.label, 0]));
+  const ageGroupGenderCounts = {
+    Mehed: Object.fromEntries(participantAgeGroups.map(group => [group.label, 0])),
+    Naised: Object.fromEntries(participantAgeGroups.map(group => [group.label, 0]))
+  };
+
+  normalizedRows.forEach(row => {
+    const group = participantAgeGroups.find(item => Number.isInteger(row.age) && row.age >= item.min && row.age <= item.max);
+    if (!group) return;
+    ageGroupCounts[group.label] += 1;
+    if (row.gender === 'Mehed' || row.gender === 'Naised') {
+      ageGroupGenderCounts[row.gender][group.label] += 1;
+    }
+  });
+
+  const educationCounts = toCountMap(normalizedRows, participantEducationLabels, row => row.education);
+  const educationGenderCounts = {
+    Mehed: toCountMap(normalizedRows.filter(row => row.gender === 'Mehed'), participantEducationLabels, row => row.education),
+    Naised: toCountMap(normalizedRows.filter(row => row.gender === 'Naised'), participantEducationLabels, row => row.education)
+  };
+
+  const occupationCounts = toCountMap(normalizedRows, participantOccupationLabels, row => row.occupation);
+  const sectorCounts = toCountMap(normalizedRows, participantSectorLabels, row => row.sector);
+
+  const men = genderCounts['Mehed'];
+  const women = genderCounts['Naised'];
+  const dominantRegion = participantRegionLabels.reduce((best, label) => regionCounts[label] > regionCounts[best] ? label : best, participantRegionLabels[0]);
+  const dominantAgeGroup = participantAgeGroups.reduce((best, group) => ageGroupCounts[group.label] > ageGroupCounts[best.label] ? group : best, participantAgeGroups[0]).label;
+  const dominantEducation = participantEducationLabels.reduce((best, label) => educationCounts[label] > educationCounts[best] ? label : best, participantEducationLabels[0]);
+  const dominantSector = participantSectorLabels.reduce((best, label) => sectorCounts[label] > sectorCounts[best] ? label : best, participantSectorLabels[0]);
+
+  const educationGap = participantEducationLabels.reduce((best, label) => {
+    const menPct = men ? (educationGenderCounts.Mehed[label] / men) * 100 : 0;
+    const womenPct = women ? (educationGenderCounts.Naised[label] / women) * 100 : 0;
+    const diff = Math.abs(womenPct - menPct);
+    if (diff > best.diff) {
+      return { label, diff, menPct: Number(menPct.toFixed(1)), womenPct: Number(womenPct.toFixed(1)) };
+    }
+    return best;
+  }, { label: participantEducationLabels[0], diff: -1, menPct: 0, womenPct: 0 });
+
+  const insights = [
+    `Suurim osalejate koond on piirkonnas <strong>${dominantRegion}</strong>, kus elab ${regionCounts[dominantRegion]} osalejat ehk ${formatShare(regionCounts[dominantRegion], total)} kõigist osalejatest.`,
+    `Kõige arvukam vanuserühm on <strong>${dominantAgeGroup}</strong> (${ageGroupCounts[dominantAgeGroup]} osalejat), samal ajal kui mediaanvanus on ${formatDecimal(medianAge)} aastat.`,
+    `Sooline jaotus kaldub meeste poole: mehi on ${men} (${formatShare(men, total)}) ja naisi ${women} (${formatShare(women, total)}).`,
+    `Domineeriv haridustase on <strong>${dominantEducation}</strong>, mis hõlmab ${educationCounts[dominantEducation]} osalejat ehk ${formatShare(educationCounts[dominantEducation], total)} kõigist osalejatest.`,
+    `Tööandjate lõikes on suurim rühm <strong>${dominantSector}</strong> (${sectorCounts[dominantSector]} osalejat), mis viitab sellele, et märkimisväärsel osal puudub organisatsiooniline seos või see pole teada.`
+  ];
+  if (educationGap.diff >= 5) {
+    const higherShareGroup = educationGap.womenPct > educationGap.menPct ? 'naistel' : 'meestel';
+    insights.push(`Suurim sooline erinevus hariduses tuleb kategoorias <strong>${educationGap.label}</strong>: see osakaal on ${higherShareGroup} (${formatDecimal(educationGap.womenPct)}% naistest vs ${formatDecimal(educationGap.menPct)}% meestest).`);
+  }
+
+  return {
+    meta: reportData.participantsOverview.meta,
+    rows: normalizedRows,
+    kpis: [
+      { label: 'Osalejaid kokku', value: String(total) },
+      { label: 'Eri omavalitsusi', value: String(knownMunicipalities.length) },
+      { label: 'Keskmine vanus', value: formatDecimal(avgAge), sub: 'aastat' },
+      { label: 'Vanusevahemik', value: `${youngest}–${oldest}`, sub: 'noorim–vanim' },
+      { label: 'Mehi / naisi', value: `${men} / ${women}`, sub: 'kõigist osalejatest' },
+      { label: 'Eri organisatsioone', value: String(uniqueOrganizations.length) }
+    ],
+    geography: {
+      labels: participantRegionLabels,
+      counts: participantRegionLabels.map(label => regionCounts[label]),
+      uniqueMunicipalities: knownMunicipalities.length,
+      municipalityCounts,
+      municipalPoints
+    },
+    demographics: {
+      genderLabels,
+      genderCounts: genderLabels.map(label => genderCounts[label]),
+      ageGroupLabels: participantAgeGroups.map(group => group.label),
+      ageGroupCounts: participantAgeGroups.map(group => ageGroupCounts[group.label]),
+      ageGroupByGender: {
+        Mehed: participantAgeGroups.map(group => ageGroupGenderCounts.Mehed[group.label]),
+        Naised: participantAgeGroups.map(group => ageGroupGenderCounts.Naised[group.label])
+      },
+      summary: {
+        men,
+        women,
+        menPct: Number(((men / total) * 100).toFixed(1)),
+        womenPct: Number(((women / total) * 100).toFixed(1)),
+        avgAge,
+        medianAge,
+        youngest,
+        oldest
+      }
+    },
+    education: {
+      labels: participantEducationLabels,
+      counts: participantEducationLabels.map(label => educationCounts[label]),
+      byGender: {
+        Mehed: participantEducationLabels.map(label => educationGenderCounts.Mehed[label]),
+        Naised: participantEducationLabels.map(label => educationGenderCounts.Naised[label])
+      }
+    },
+    occupation: {
+      labels: participantOccupationLabels,
+      counts: participantOccupationLabels.map(label => occupationCounts[label])
+    },
+    sector: {
+      labels: participantSectorLabels,
+      counts: participantSectorLabels.map(label => sectorCounts[label]),
+      uniqueOrganizations: uniqueOrganizations.length
+    },
+    insights
+  };
+};
+
+reportData.participantsOverview = buildParticipantsOverview(reportData.participantsOverview.sourceRows);
+
+validateDataPeriod();
+document.getElementById('subtitle').textContent = `Lõpetajad vs katkestajad · ${reportMeta.period} · Allikas: ${reportMeta.source}`;
+document.getElementById('overviewActive').textContent = reportData.overview.active;
+document.getElementById('overviewDropout').textContent = reportData.overview.dropout;
+document.getElementById('overviewDropoutRate').textContent = `~${reportData.overview.dropoutRate}% katkestamismäär`;
+document.getElementById('overviewGenderActive').textContent = formatGender(reportData.overview.genderActive);
+document.getElementById('overviewGenderDropout').textContent = formatGender(reportData.overview.genderDropout);
+
+document.getElementById('newSegmentMetrics').innerHTML = reportData.newData.metrics
+  .map(metric => `
+    <div class="metric">
+      <p class="metric-label">${metric.label}</p>
+      <p class="metric-value">${metric.value}</p>
+    </div>
+  `)
+  .join('');
+
+// Plugin: render data values directly on chart (bars and doughnut segments).
+// Makes the dashboard self-explanatory when exported as a static image (e.g. slides),
+// without needing a hover tooltip. Format is configurable per chart via
+// options.plugins.valueLabels.format (function returning a string), with
+// minPercent (doughnut) and minValue (bars) thresholds to skip clutter.
+const valueLabelsPlugin = {
+  id: 'valueLabels',
+  afterDatasetsDraw(chart, _args, pluginOpts) {
+    if (!pluginOpts || pluginOpts.enabled === false) return;
+    const ctx = chart.ctx;
+    const fmt = pluginOpts.format || (v => String(v));
+    const minPercent = pluginOpts.minPercent != null ? pluginOpts.minPercent : 4;  // doughnut threshold (% of total)
+    const color = pluginOpts.color || '#1a1a18';
+    const fontSize = pluginOpts.fontSize || 11;
+    const fontFamily = "'DM Sans', system-ui, sans-serif";
+
+    chart.data.datasets.forEach((dataset, datasetIndex) => {
+      const meta = chart.getDatasetMeta(datasetIndex);
+      if (!meta || meta.hidden) return;
+
+      meta.data.forEach((element, index) => {
+        const raw = dataset.data[index];
+        if (raw == null) return;
+        const numeric = typeof raw === 'object' ? raw.y : raw;
+        if (typeof numeric !== 'number' || isNaN(numeric) || numeric === 0) return;
+
+        ctx.save();
+        ctx.fillStyle = color;
+        ctx.font = `500 ${fontSize}px ${fontFamily}`;
+        ctx.textBaseline = 'middle';
+
+        if (chart.config.type === 'doughnut' || chart.config.type === 'pie') {
+          // Skip tiny slices to avoid crowding
+          const total = dataset.data.reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+          if (total > 0 && (numeric / total) * 100 < minPercent) {
+            ctx.restore();
+            return;
+          }
+          // Place at midpoint between inner and outer radius along the segment angle
+          const props = element.getProps(['x', 'y', 'startAngle', 'endAngle', 'innerRadius', 'outerRadius'], true);
+          const angle = (props.startAngle + props.endAngle) / 2;
+          const radius = (props.innerRadius + props.outerRadius) / 2;
+          const x = props.x + Math.cos(angle) * radius;
+          const y = props.y + Math.sin(angle) * radius;
+          ctx.fillStyle = '#ffffff';
+          ctx.textAlign = 'center';
+          ctx.fillText(fmt(numeric, { datasetIndex, index, dataset, chart }), x, y);
+        } else {
+          // Bars: vertical or horizontal. Check chart.options first then config fallback.
+          const indexAxis = (chart.options && chart.options.indexAxis) || (chart.config.options && chart.config.options.indexAxis);
+          const isHorizontal = indexAxis === 'y';
+          const props = element.getProps(['x', 'y', 'base'], true);
+          const text = fmt(numeric, { datasetIndex, index, dataset, chart });
+          if (isHorizontal) {
+            // Place to the right of bar tip (or left if negative)
+            ctx.textAlign = 'left';
+            ctx.fillText(text, props.x + 4, props.y);
+          } else {
+            // Place above bar tip
+            ctx.textAlign = 'center';
+            ctx.fillText(text, props.x, props.y - 6);
+          }
+        }
+        ctx.restore();
+      });
+    });
+  }
+};
+Chart.register(valueLabelsPlugin);
+
+
+const barOptions = (max, showPct = true) => ({
+  responsive: true, maintainAspectRatio: false,
+  layout: { padding: { top: 18 } },
+  plugins: {
+    legend: { display: false },
+    tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + (showPct ? '%' : '') } },
+    valueLabels: {
+      format: v => v.toFixed(1) + (showPct ? '%' : '')
+    }
+  },
+  scales: {
+    x: { ticks: { autoSkip: false }, grid: { display: false } },
+    y: { beginAtZero: true, max, ticks: { callback: v => v + (showPct ? '%' : '') } }
+  }
+});
+
+new Chart(document.getElementById('eduChart'), {
+  type: 'bar',
+  data: reportData.education,
+  options: barOptions(calcYAxisMax(reportData.education.datasets, 100))
+});
+
+new Chart(document.getElementById('localChart'), {
+  type: 'bar',
+  data: {
+    labels: reportData.location.labels,
+    datasets: reportData.location.datasets
+  },
+  options: barOptions(calcYAxisMax(reportData.location.datasets, 50))
+});
+
+const pieOpts = data => ({
+  type: 'doughnut',
+  data: {
+    labels: reportData.location.pieLabels,
+    datasets: [{ data, backgroundColor: reportData.location.pieColors, borderWidth: 1, borderColor: 'transparent' }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false, cutout: '55%',
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ctx.label + ': ' + ctx.parsed.toFixed(1) + '%' } },
+      valueLabels: {
+        format: v => v.toFixed(1) + '%',
+        fontSize: 10,
+        minPercent: 6
+      }
+    }
+  }
+});
+new Chart(document.getElementById('pieActive'), pieOpts(reportData.location.pieActive));
+new Chart(document.getElementById('pieDropout'), pieOpts(reportData.location.pieDropout));
+
+new Chart(document.getElementById('newSegmentChart'), {
+  type: 'bar',
+  data: reportData.newData.chart,
+  options: barOptions(calcYAxisMax(reportData.newData.chart.datasets, 70), false)
+});
+
+new Chart(document.getElementById('participantsGeoChart'), {
+  type: 'bar',
+  data: {
+    labels: reportData.participantsOverview.geography.labels,
+    datasets: [{
+      label: 'Osalejad',
+      data: reportData.participantsOverview.geography.counts,
+      backgroundColor: [
+        participantColors.blue,
+        participantColors.green,
+        participantColors.rose,
+        participantColors.gold,
+        participantColors.sand,
+        '#8F8D86'
+      ],
+      borderRadius: 6,
+      borderSkipped: false
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: 'y',
+    layout: { padding: { right: 32 } },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => `${ctx.label}: ${ctx.parsed.x} osalejat`
+        }
+      },
+      valueLabels: {
+        format: v => String(v)
+      }
+    },
+    scales: {
+      x: {
+        beginAtZero: true,
+        grid: { color: 'rgba(0,0,0,0.08)' },
+        ticks: { precision: 0 }
+      },
+      y: {
+        grid: { display: false }
+      }
+    }
+  }
+});
+
+new Chart(document.getElementById('participantsGenderChart'), {
+  type: 'doughnut',
+  data: {
+    labels: reportData.participantsOverview.demographics.genderLabels,
+    datasets: [{
+      data: reportData.participantsOverview.demographics.genderCounts,
+      backgroundColor: [participantColors.blue, participantColors.rose, participantColors.sand],
+      borderWidth: 1,
+      borderColor: 'transparent'
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '58%',
+    plugins: {
+      legend: { position: 'bottom' },
+      tooltip: {
+        callbacks: {
+          label: ctx => `${ctx.label}: ${ctx.parsed} osalejat (${formatShare(ctx.parsed, reportData.participantsOverview.rows.length)})`
+        }
+      },
+      valueLabels: {
+        format: v => `${v} (${formatShare(v, reportData.participantsOverview.rows.length)})`,
+        fontSize: 11,
+        minPercent: 4
+      }
+    }
+  }
+});
+
+new Chart(document.getElementById('participantsAgeChart'), {
+  type: 'bar',
+  data: {
+    labels: reportData.participantsOverview.demographics.ageGroupLabels,
+    datasets: [{
+      label: 'Osalejad',
+      data: reportData.participantsOverview.demographics.ageGroupCounts,
+      backgroundColor: [participantColors.blue, participantColors.green, participantColors.rose, participantColors.gold],
+      borderRadius: 6,
+      borderSkipped: false
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    layout: { padding: { top: 18 } },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => `${ctx.label}: ${ctx.parsed.y} osalejat`
+        }
+      },
+      valueLabels: {
+        format: v => String(v)
+      }
+    },
+    scales: {
+      x: { grid: { display: false } },
+      y: {
+        beginAtZero: true,
+        ticks: { precision: 0 }
+      }
+    }
+  }
+});
+
+new Chart(document.getElementById('participantsAgeGenderChart'), {
+  type: 'bar',
+  data: {
+    labels: reportData.participantsOverview.demographics.ageGroupLabels,
+    datasets: [
+      {
+        label: 'Mehed',
+        data: reportData.participantsOverview.demographics.ageGroupByGender.Mehed,
+        backgroundColor: participantColors.blue,
+        borderRadius: 6,
+        borderSkipped: false
+      },
+      {
+        label: 'Naised',
+        data: reportData.participantsOverview.demographics.ageGroupByGender.Naised,
+        backgroundColor: participantColors.rose,
+        borderRadius: 6,
+        borderSkipped: false
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    layout: { padding: { top: 18 } },
+    plugins: {
+      legend: { position: 'bottom' },
+      tooltip: {
+        callbacks: {
+          label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y} osalejat`
+        }
+      },
+      valueLabels: {
+        format: v => String(v),
+        fontSize: 10
+      }
+    },
+    scales: {
+      x: { stacked: false, grid: { display: false } },
+      y: {
+        beginAtZero: true,
+        ticks: { precision: 0 }
+      }
+    }
+  }
+});
+
+new Chart(document.getElementById('participantsEducationChart'), {
+  type: 'bar',
+  data: {
+    labels: reportData.participantsOverview.education.labels,
+    datasets: [
+      {
+        label: 'Kokku',
+        data: reportData.participantsOverview.education.counts,
+        backgroundColor: participantColors.green,
+        borderRadius: 6,
+        borderSkipped: false
+      },
+      {
+        label: 'Mehed',
+        data: reportData.participantsOverview.education.byGender.Mehed,
+        backgroundColor: participantColors.blue,
+        borderRadius: 6,
+        borderSkipped: false
+      },
+      {
+        label: 'Naised',
+        data: reportData.participantsOverview.education.byGender.Naised,
+        backgroundColor: participantColors.rose,
+        borderRadius: 6,
+        borderSkipped: false
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    layout: { padding: { top: 18 } },
+    plugins: {
+      legend: { position: 'bottom' },
+      tooltip: {
+        callbacks: {
+          label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y} osalejat`
+        }
+      },
+      valueLabels: {
+        format: v => String(v),
+        fontSize: 10
+      }
+    },
+    scales: {
+      x: { grid: { display: false } },
+      y: {
+        beginAtZero: true,
+        ticks: { precision: 0 }
+      }
+    }
+  }
+});
+
+new Chart(document.getElementById('participantsOccupationChart'), {
+  type: 'bar',
+  data: {
+    labels: reportData.participantsOverview.occupation.labels,
+    datasets: [{
+      label: 'Osalejad',
+      data: reportData.participantsOverview.occupation.counts,
+      backgroundColor: participantColors.blue,
+      borderRadius: 6,
+      borderSkipped: false
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: 'y',
+    layout: { padding: { right: 32 } },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => `${ctx.label}: ${ctx.parsed.x} osalejat`
+        }
+      },
+      valueLabels: {
+        format: v => String(v)
+      }
+    },
+    scales: {
+      x: {
+        beginAtZero: true,
+        ticks: { precision: 0 }
+      },
+      y: {
+        grid: { display: false }
+      }
+    }
+  }
+});
+
+new Chart(document.getElementById('participantsSectorChart'), {
+  type: 'doughnut',
+  data: {
+    labels: reportData.participantsOverview.sector.labels,
+    datasets: [{
+      data: reportData.participantsOverview.sector.counts,
+      backgroundColor: [participantColors.blue, participantColors.green, participantColors.rose, participantColors.sand],
+      borderWidth: 1,
+      borderColor: 'transparent'
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '58%',
+    plugins: {
+      legend: { position: 'bottom' },
+      tooltip: {
+        callbacks: {
+          label: ctx => `${ctx.label}: ${ctx.parsed} osalejat (${formatShare(ctx.parsed, reportData.participantsOverview.rows.length)})`
+        }
+      },
+      valueLabels: {
+        format: v => `${v} (${formatShare(v, reportData.participantsOverview.rows.length)})`,
+        fontSize: 11,
+        minPercent: 4
+      }
+    }
+  }
+});
+
+// Centroid coordinates for Estonian municipalities (post-2017 administrative division).
+// Used to plot bubbles on the map. Names match the canonical form produced by canonicalizeMunicipality().
+const municipalityCentroids = {
+  // Harjumaa
+  'Tallinn': [59.4370, 24.7536],
+  'Harku vald': [59.3897, 24.5611],
+  'Viimsi vald': [59.5172, 24.8367],
+  'Rae vald': [59.3500, 24.9000],
+  'Saue vald': [59.3186, 24.5483],
+  'Saku vald': [59.3022, 24.6736],
+  'Kuusalu vald': [59.4439, 25.4400],
+  'Raasiku vald': [59.3617, 25.2031],
+  'Kose vald': [59.1900, 25.1700],
+  'Kohila vald': [59.1683, 24.7553],
+  'Keila linn': [59.3036, 24.4128],
+  'Maardu linn': [59.4767, 25.0150],
+  'Loksa linn': [59.5783, 25.7186],
+  'Anija vald': [59.2700, 25.3833],
+  'Jõelähtme vald': [59.4600, 25.1700],
+  'Lääne-Harju vald': [59.2500, 24.0500],
+  // Tartumaa
+  'Tartu linn': [58.3776, 26.7290],
+  'Tartu vald': [58.4500, 26.7500],
+  'Luunja vald': [58.3667, 26.8333],
+  'Nõo vald': [58.2733, 26.5350],
+  'Kastre vald': [58.3000, 26.9667],
+  'Elva vald': [58.2225, 26.4225],
+  'Kambja vald': [58.2167, 26.6667],
+  'Peipsiääre vald': [58.5500, 27.0500],
+  // Võrumaa
+  'Võru linn': [57.8333, 27.0167],
+  'Võru vald': [57.8500, 26.9000],
+  'Rõuge vald': [57.7256, 26.9000],
+  'Antsla vald': [57.8358, 26.5400],
+  'Setomaa vald': [57.8500, 27.5000],
+  // Põlvamaa
+  'Põlva vald': [58.0531, 27.0694],
+  'Räpina vald': [58.0983, 27.4631],
+  'Kanepi vald': [58.0167, 26.7500],
+  // Ida-Virumaa
+  'Jõhvi vald': [59.3589, 27.4214],
+  'Lüganuse vald': [59.3500, 27.0500],
+  'Narva linn': [59.3772, 28.1903],
+  'Narva-Jõesuu linn': [59.4633, 28.0414],
+  'Sillamäe linn': [59.3939, 27.7639],
+  'Kohtla-Järve linn': [59.3986, 27.2731],
+  'Toila vald': [59.4167, 27.5167],
+  'Alutaguse vald': [59.1500, 27.4167],
+  // Lääne-Virumaa
+  'Rakvere linn': [59.3464, 26.3558],
+  'Rakvere vald': [59.3000, 26.3500],
+  'Haljala vald': [59.4267, 26.2683],
+  'Tapa vald': [59.2611, 25.9583],
+  'Kadrina vald': [59.3372, 26.1450],
+  'Väike-Maarja vald': [59.1267, 26.2483],
+  'Vinni vald': [59.2833, 26.4333],
+  'Viru-Nigula vald': [59.4833, 26.4500],
+  // Järvamaa
+  'Paide linn': [58.8856, 25.5572],
+  'Järva vald': [58.9000, 25.7500],
+  'Türi vald': [58.8083, 25.4319],
+  // Raplamaa
+  'Rapla vald': [59.0072, 24.7928],
+  'Märjamaa vald': [58.9056, 24.4283],
+  'Kehtna vald': [58.9344, 24.8722],
+  'Kohila vald ': [59.1683, 24.7553],
+  // Pärnumaa
+  'Pärnu linn': [58.3859, 24.4971],
+  'Tori vald': [58.4722, 24.8056],
+  'Saarde vald': [58.0833, 25.0500],
+  'Häädemeeste vald': [58.0833, 24.5000],
+  'Põhja-Pärnumaa vald': [58.6500, 24.9000],
+  // Läänemaa
+  'Haapsalu linn': [58.9431, 23.5408],
+  'Lääneranna vald': [58.6167, 23.7833],
+  'Vormsi vald': [58.9967, 23.2389],
+  // Saaremaa
+  'Saaremaa vald': [58.2528, 22.4839],
+  'Muhu vald': [58.6000, 23.2500],
+  'Ruhnu vald': [57.8000, 23.2500],
+  // Hiiumaa
+  'Hiiumaa vald': [58.9167, 22.7333],
+  // Viljandimaa
+  'Viljandi linn': [58.3639, 25.5900],
+  'Viljandi vald': [58.4167, 25.7500],
+  'Mulgi vald': [58.1500, 25.5000],
+  'Põhja-Sakala vald': [58.5000, 25.5500],
+  // Jõgevamaa
+  'Jõgeva vald': [58.7472, 26.3933],
+  'Mustvee vald': [58.8500, 26.9333],
+  'Põltsamaa vald': [58.6517, 25.9728],
+  // Valgamaa
+  'Valga vald': [57.7775, 26.0428],
+  'Tõrva vald': [58.0000, 25.9333],
+  'Otepää vald': [58.0556, 26.5031]
+};
+
+// Color and size scales for participant bubbles.
+const mapColorLo = '#378ADD';   // saturated mid-blue — visible on light land fill
+const mapColorHi = '#042C53';   // dark navy for highest counts
+const mapInterpolator = d3.interpolate(mapColorLo, mapColorHi);
+const mapBubbleStroke = '#042C53';
+
+const COUNTY_TOPOJSON_URL = 'https://cdn.jsdelivr.net/gh/buildig/EHAK@master/topojson/maakond.json';
+const COUNTRY_FALLBACK_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json';
+
+let estoniaTopologyPromise = null;
+const loadEstoniaTopology = () => {
+  if (!estoniaTopologyPromise) {
+    estoniaTopologyPromise = d3.json(COUNTY_TOPOJSON_URL).then(topology => {
+      const objKey = Object.keys(topology.objects)[0];
+      const counties = topojson.feature(topology, topology.objects[objKey]);
+      const countyMesh = topojson.mesh(topology, topology.objects[objKey], (a, b) => a !== b);
+      const countryOutline = topojson.merge(topology, topology.objects[objKey].geometries);
+      return { counties, countyMesh, countryOutline, source: 'counties' };
+    }).catch(error => {
+      console.warn('Maakonna topojson laadimine ebaõnnestus, kasutame riigi piirjoont:', error);
+      return d3.json(COUNTRY_FALLBACK_URL).then(world => {
+        const estonia = topojson.feature(world, world.objects.countries).features.find(c => c.id === '233');
+        return { counties: estonia, countyMesh: null, countryOutline: estonia, source: 'country' };
+      });
+    });
+  }
+  return estoniaTopologyPromise;
+};
+
+const ensureMapTooltip = mapEl => {
+  let tooltip = mapEl.querySelector('.map-tooltip');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.className = 'map-tooltip';
+    tooltip.id = 'participantsGeoMapTooltip';
+    tooltip.setAttribute('role', 'status');
+    tooltip.setAttribute('aria-live', 'polite');
+    mapEl.appendChild(tooltip);
+  }
+  return tooltip;
+};
+
+const renderParticipantsGeoMap = async () => {
+  const mapEl = document.getElementById('participantsGeoMap');
+  const legendEl = document.getElementById('participantsGeoMapLegend');
+  if (!mapEl || !legendEl) return;
+
+  // Aggregate municipalPoints to (name, count, lat, lon) keyed by centroid table.
+  const points = reportData.participantsOverview.geography.municipalPoints || [];
+  const located = [];
+  const unlocated = [];
+  points.forEach(point => {
+    const coord = municipalityCentroids[point.municipality];
+    if (coord && point.municipality !== 'Teadmata') {
+      located.push({ name: point.municipality, count: point.count, lat: coord[0], lon: coord[1] });
+    } else {
+      unlocated.push(point);
+    }
+  });
+
+  if (unlocated.length) {
+    console.warn('Kaardiga liitmata omavalitsused:', unlocated.map(item => ({ municipality: item.municipality, count: item.count })));
+  }
+
+  const W = 680, H = 440, PAD = 16;
+  mapEl.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Eesti kaart osalejate jaotusega"></svg>`;
+  const svg = d3.select(mapEl).select('svg');
+  const tooltipEl = ensureMapTooltip(mapEl);
+
+  const topo = await loadEstoniaTopology();
+  const projection = d3.geoMercator().fitExtent([[PAD, PAD], [W - PAD, H - PAD]], topo.counties);
+  const path = d3.geoPath(projection);
+
+  // Country fill (merged outline of all counties = exact Estonia border).
+  const outlineDatum = topo.countryOutline.type === 'Feature'
+    ? topo.countryOutline
+    : { type: 'MultiPolygon', coordinates: topo.countryOutline.coordinates };
+  svg.append('path')
+    .datum(outlineDatum)
+    .attr('d', path)
+    .attr('fill', 'rgba(93, 202, 165, 0.12)')
+    .attr('stroke', 'rgba(24, 95, 165, 0.55)')
+    .attr('stroke-width', 1)
+    .attr('stroke-linejoin', 'round');
+
+  // Internal county borders (skipped if fallback to country-only outline).
+  if (topo.countyMesh) {
+    svg.append('path')
+      .datum(topo.countyMesh)
+      .attr('d', path)
+      .attr('fill', 'none')
+      .attr('stroke', 'rgba(24, 95, 165, 0.28)')
+      .attr('stroke-width', 0.6)
+      .attr('stroke-linejoin', 'round');
+  }
+
+  // Bubbles: sqrt-scaled radius and color, sorted largest-first so smaller render on top.
+  const maxCount = located.length ? d3.max(located, d => d.count) : 1;
+  const rScale = d3.scaleSqrt().domain([0, maxCount]).range([0, 24]);
+  const colorScale = d3.scaleSqrt().domain([1, maxCount]).range([0, 1]);
+  const fillColor = c => mapInterpolator(colorScale(c));
+  const sorted = [...located].sort((a, b) => b.count - a.count);
+
+  const showTooltip = (event, d) => {
+    const bounds = mapEl.getBoundingClientRect();
+    const relX = Math.max(6, Math.min(event.clientX - bounds.left + 10, bounds.width - 12));
+    const relY = Math.max(8, event.clientY - bounds.top - 16);
+    tooltipEl.textContent = `${d.name}: ${d.count} ${d.count === 1 ? 'osaleja' : 'osalejat'}`;
+    tooltipEl.style.left = relX + 'px';
+    tooltipEl.style.top = relY + 'px';
+    tooltipEl.classList.add('is-visible');
+  };
+  const hideTooltip = () => tooltipEl.classList.remove('is-visible');
+
+  svg.selectAll('circle.bubble')
+    .data(sorted)
+    .join('circle')
+    .attr('class', 'bubble')
+    .attr('cx', d => projection([d.lon, d.lat])[0])
+    .attr('cy', d => projection([d.lon, d.lat])[1])
+    .attr('r', d => Math.max(3.5, rScale(d.count)))
+    .attr('fill', d => fillColor(d.count))
+    .attr('fill-opacity', 0.9)
+    .attr('stroke', mapBubbleStroke)
+    .attr('stroke-width', 1)
+    .attr('tabindex', 0)
+    .style('cursor', 'pointer')
+    .on('mousemove', showTooltip)
+    .on('mouseenter', showTooltip)
+    .on('mouseleave', hideTooltip)
+    .on('focus', function(event, d) {
+      const bbox = this.getBoundingClientRect();
+      showTooltip({ clientX: bbox.left + bbox.width / 2, clientY: bbox.top }, d);
+    })
+    .on('blur', hideTooltip);
+
+  // Legend: size samples + color gradient bar.
+  const legendCounts = maxCount >= 20
+    ? [1, 5, 20, maxCount].filter((v, i, a) => a.indexOf(v) === i && v <= maxCount)
+    : [1, Math.max(2, Math.round(maxCount / 2)), maxCount].filter((v, i, a) => a.indexOf(v) === i);
+  const sizeSamples = legendCounts.map(c => {
+    const r = Math.max(3.5, rScale(c));
+    return `<span class="map-legend-item"><svg width="${r * 2 + 2}" height="${r * 2 + 2}" aria-hidden="true"><circle cx="${r + 1}" cy="${r + 1}" r="${r}" fill="${fillColor(c)}" fill-opacity="0.9" stroke="${mapBubbleStroke}" stroke-width="1"/></svg>${c}</span>`;
+  }).join('');
+  const gradientCss = `linear-gradient(to right, ${mapColorLo}, ${mapInterpolator(0.5)}, ${mapColorHi})`;
+  const totalLocated = located.reduce((sum, p) => sum + p.count, 0);
+  const totalUnlocated = unlocated.reduce((sum, p) => sum + p.count, 0);
+  const noteParts = [`${totalLocated} osalejat ${located.length} omavalitsusest`];
+  if (totalUnlocated) noteParts.push(`${totalUnlocated} kirje elukoht puudu`);
+  legendEl.innerHTML = `
+    <div class="map-legend-group">
+      <span>Osalejate arv:</span>
+      ${sizeSamples}
+    </div>
+    <div class="map-legend-group">
+      <span>1</span>
+      <span class="map-legend-bar" style="background: ${gradientCss};" aria-hidden="true"></span>
+      <span>${maxCount}</span>
+    </div>
+    <span class="map-legend-item" style="flex-basis: 100%;">${noteParts.join(' · ')}</span>
+  `;
+};
+
+document.getElementById('participantsSourceNote').textContent = `Sisaldab kõiki programmi alustanud osalejaid — lõpetajad ja programmis katkestanud kokku (välja arvatud need, kes tühistasid registreerimise enne alustamist). Allikas: ${reportData.participantsOverview.meta.source} · uuendatud ${reportData.participantsOverview.meta.updated}`;
+document.getElementById('participantsKpis').innerHTML = reportData.participantsOverview.kpis.map(metric => `
+  <div class="metric">
+    <p class="metric-label">${metric.label}</p>
+    <p class="metric-value">${metric.value}</p>
+    ${metric.sub ? `<p class="metric-sub">${metric.sub}</p>` : ''}
+  </div>
+`).join('');
+document.getElementById('participantsGeoNote').textContent = `Osalejad ${reportData.participantsOverview.geography.uniqueMunicipalities} eri omavalitsusest.`;
+document.getElementById('participantsDemoMetrics').innerHTML = [
+  { label: 'Mehi', value: `${reportData.participantsOverview.demographics.summary.men}`, sub: `${formatDecimal(reportData.participantsOverview.demographics.summary.menPct)}%` },
+  { label: 'Naisi', value: `${reportData.participantsOverview.demographics.summary.women}`, sub: `${formatDecimal(reportData.participantsOverview.demographics.summary.womenPct)}%` },
+  { label: 'Mediaanvanus', value: formatDecimal(reportData.participantsOverview.demographics.summary.medianAge), sub: 'aastat' },
+  { label: 'Vanus', value: `${reportData.participantsOverview.demographics.summary.youngest}–${reportData.participantsOverview.demographics.summary.oldest}`, sub: 'noorim–vanim' }
+].map(metric => `
+  <div class="metric">
+    <p class="metric-label">${metric.label}</p>
+    <p class="metric-value">${metric.value}</p>
+    <p class="metric-sub">${metric.sub}</p>
+  </div>
+`).join('');
+document.getElementById('participantsSectorNote').textContent = `Tööandja väljalt tuvastati ${reportData.participantsOverview.sector.uniqueOrganizations} eri organisatsiooni.`;
+document.getElementById('participantsMapNote').textContent = 'Punkti suurus näitab osalejate arvu omavalitsuses; täpse arvu näeb hiirega, fookusega või puudutusega punkti kohal.';
+document.getElementById('participantInsights').innerHTML = reportData.participantsOverview.insights
+  .map(item => `<div class="insight">${item}</div>`)
+  .join('');
+renderParticipantsGeoMap();
+
+const tabs = [...document.querySelectorAll('.category-tab')];
+const panels = [...document.querySelectorAll('.category-panel')];
+tabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    const targetId = tab.dataset.target;
+    tabs.forEach(item => {
+      const isActive = item === tab;
+      item.classList.toggle('is-active', isActive);
+      item.setAttribute('aria-selected', String(isActive));
+    });
+    panels.forEach(panel => {
+      panel.hidden = panel.id !== targetId;
+    });
+    if (targetId === 'map-view') {
+      renderParticipantsGeoMap();
+    }
+  });
+});
+window.addEventListener('resize', () => {
+  if (!document.getElementById('map-view').hidden) {
+    renderParticipantsGeoMap();
+  }
+});
+
+const [activeMale, activeFemale] = reportData.overview.genderActive;
+const [dropMale, dropFemale] = reportData.overview.genderDropout;
+const eduActive = reportData.education.datasets[0].data;
+const eduDrop = reportData.education.datasets[1].data;
+const locActive = reportData.location.datasets[0].data;
+const locDrop = reportData.location.datasets[1].data;
+
+const insights = [
+  `<div class="insight"><strong>Sugu ei ennusta katkestamist.</strong> Sooline jaotus on mõlemas grupis peaaegu identne (lõpetajad ${activeMale}/${activeFemale}%, katkestajad ${dropMale}/${dropFemale}% M/N), seega sugu ei ole katkestamise riskitegur.</div>`,
+  `<div class="insight"><strong>Kõrgharidusega osalejad katkestavad sagedamini.</strong> Katkestajate hulgas on kõrgharidusega inimesi ${eduDrop[0]}%, lõpetajate hulgas ${eduActive[0]}%. Üldkeskharidusega osalejad on seevastu katkestajate seas vähem esindatud (${eduDrop[1]}% vs ${eduActive[1]}%).</div>`,
+  `<div class="insight"><strong>Tallinnast pärit osalejad jõuavad programmis tõenäolisemalt lõpuni.</strong> Tallinlasi on lõpetajate seas ${locActive[0]}%, kuid katkestajate seas ${locDrop[0]}% — see on ${pctDiff(locActive[0], locDrop[0])} protsendipunktiline erinevus. Harjumaa äärelinnade elanikud on katkestajate hulgas suurema osakaaluga (${locDrop[1]}% vs ${locActive[1]}%).</div>`,
+  `<div class="insight"><strong>Muu Eesti on katkestamises samuti üleesindatud.</strong> Väljaspool Harjumaad elavad osalejad moodustavad lõpetajate seas ${locActive[2]}%, kuid katkestajate seas ${locDrop[2]}%.</div>`
+];
+
+document.getElementById('insights').innerHTML = insights.join('');
+</script>
+</body>
+</html>
